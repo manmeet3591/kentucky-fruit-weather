@@ -96,6 +96,7 @@ tr.hit td{background:var(--heat-soft)}
 
 details.method{margin-top:1.5rem;border-top:1px solid var(--rule);padding-top:1rem;max-width:75ch}
 details.method summary{cursor:pointer;font-weight:600}
+.foot{padding:1rem clamp(1rem,3vw,2.5rem) 2rem;font-size:.8rem;color:var(--muted);border-top:1px solid var(--rule)}
 details.method p,details.method li{font-size:.9rem;color:var(--muted)}
 .plug{margin-top:1rem;font-size:.85rem;border:1px dashed var(--outlook);background:var(--outlook-soft);border-radius:8px;padding:.6rem .8rem;max-width:75ch}
 
@@ -132,6 +133,7 @@ details.method p,details.method li{font-size:.9rem;color:var(--muted)}
   </nav>
   <main id="main" tabindex="-1"></main>
 </div>
+<footer class="foot">Observations: NOAA Regional Climate Centers (ACIS). 16-day forecast: Open-Meteo. 46-day outlook: ECMWF IFS extended-range ensemble (EC46, 51 members) via Open-Meteo, CC BY 4.0.</footer>
 <div class="tip" id="tip" role="status" aria-live="polite"></div>
 
 <script>
@@ -323,13 +325,13 @@ function wire(){
   main.querySelectorAll('[data-seg]').forEach(b=>b.addEventListener('click',()=>{state[b.dataset.seg]=isNaN(+b.dataset.v)?b.dataset.v:+b.dataset.v;render()}));
 }
 function status(kind,text){return `<span class="status ${kind}">${esc(text)}</span>`}
-const plug=`<div class="plug"><b>Where the WKU S2S model plugs in.</b> The purple outlook (days 16 to 60) currently comes from a public seasonal ensemble (Open-Meteo). Swap in the AI sub-seasonal forecast here and every tool updates, since each one runs its crop model on observed weather plus that outlook.</div>`;
+const plug='';
 
 /* ---------------- KY series assembly ---------------- */
-function kySeries(st){ // obs from META.ky_start, then 15-day forecast, then outlook median to 60 days
+function kySeries(st){ // obs from META.ky_start, then 15-day forecast, then the EC46 ensemble median
   const s=DATA.ky[st];const dates=[],tmax=[],tmin=[],kind=[];
   s.obs.forEach((o,i)=>{dates.push(addDays(META.ky_start,i));tmax.push(o.tmax);tmin.push(o.tmin);kind.push('obs')});
-  for(let i=0;i<60;i++){const f=i<s.fc.length?s.fc[i]:s.smed[i];dates.push(addDays(FIRST_FC,i));tmax.push(f.tmax);tmin.push(f.tmin);kind.push(i<s.fc.length?'fc':'s2s')}
+  for(let i=0;i<s.smed.length;i++){const f=i<s.fc.length?s.fc[i]:s.smed[i];dates.push(addDays(FIRST_FC,i));tmax.push(f.tmax);tmin.push(f.tmin);kind.push(i<s.fc.length?'fc':'s2s')}
   return {dates,tmax,tmin,kind,nObs:s.obs.length};
 }
 
@@ -341,7 +343,7 @@ TOOLS.grape=function(){
   const bbC=lab?-6.4:-2.2;
   const ser=kySeries(state.ky);
   const now=state.season==='now';
-  const start=now?SY+'-09-07':(SY-1)+'-09-07', end=now?addDays(FIRST_FC,59):SY+'-05-15';
+  const start=now?SY+'-09-07':(SY-1)+'-09-07', end=now?addDays(FIRST_FC,st.smed.length-1):SY+'-05-15';
   const i0=ser.dates.indexOf(start), i1=ser.dates.indexOf(end);
   const dates=ser.dates.slice(i0,i1+1);
   const n=dates.length, todayIdx=now?ser.dates.indexOf(LAST_OBS)-i0:null;
@@ -354,7 +356,7 @@ TOOLS.grape=function(){
   if(now){
     const runs=st.s2s.map(mem=>{let ss={...s};return mem.map(t=>{ss=fergusonStep(ss,p,f2c(t));return c2f(ss.Hc)})});
     band.lo[todayIdx]=band.hi[todayIdx]=band.med[todayIdx]=lt[todayIdx];
-    for(let d=0;d<60;d++){const col=runs.map(r=>r[d]);const i=todayIdx+1+d;band.lo[i]=pct(col,.1);band.hi[i]=pct(col,.9);band.med[i]=pct(col,.5)}
+    for(let d=0;d<st.smed.length;d++){const col=runs.map(r=>r[d]);const i=todayIdx+1+d;band.lo[i]=pct(col,.1);band.hi[i]=pct(col,.9);band.med[i]=pct(col,.5)}
   }
   const obsMin=tmin.map((v,i)=>i<=obsEnd?v:null), fcMin=tmin.map((v,i)=>now&&i>=obsEnd&&i<=obsEnd+15?v:null), s2sMin=tmin.map((v,i)=>now&&i>=obsEnd+15?v:null);
   const hits=[];for(let i=0;i<=obsEnd;i++){if(lt[i]!=null&&tmin[i]!=null&&tmin[i]<=lt[i])hits.push(i)}
@@ -364,7 +366,7 @@ TOOLS.grape=function(){
   if(now){
     const today=lt[todayIdx];
     let minMargin=Infinity,minI=null;
-    for(let d=1;d<=60;d++){const i=todayIdx+d;const least=band.hi[i];if(least!=null&&tmin[i]!=null){const mg=tmin[i]-least;if(mg<minMargin){minMargin=mg;minI=i}}}
+    for(let d=1;d<=st.smed.length;d++){const i=todayIdx+d;const least=band.hi[i];if(least!=null&&tmin[i]!=null){const mg=tmin[i]-least;if(mg<minMargin){minMargin=mg;minI=i}}}
     const endI=n-1;
     head=`${state.cultivar} buds at ${st.name} are hardy to about <span class="num">${r0(today)}°F</span> today, and the outlook takes them to <span class="num">${r0(band.med[endI])}°F</span> by ${fmtD(dates[endI])}.`;
     sub=`Ensemble range on ${fmtD(dates[endI])}: ${r0(band.lo[endI])}°F to ${r0(band.hi[endI])}°F. The tightest forecast night is ${fmtD(dates[minI])}, with a low near ${r0(tmin[minI])}°F against buds hardy to ${r0(band.hi[minI])}°F in the least-hardy member, a ${r0(minMargin)}°F margin.`;
@@ -384,10 +386,10 @@ TOOLS.grape=function(){
     ${now?plug:''}
     <details class="method"><summary>How this works</summary>
     <p>Bud cold hardiness (LT50, the temperature that kills half the primary buds) comes from the discrete-dynamic model of Ferguson et al. (2014, Am. J. Enol. Vitic. 65:59), the same model behind NEWA's and WSU AgWeatherNet's grape tools. It starts on Sept 7 and steps through daily mean temperature, with cultivar-specific acclimation and deacclimation rates, temperature thresholds, and a chilling boundary (base 10°C) that marks the shift from endo- to ecodormancy.</p>
-    <p>For the outlook, the model is run separately through each ensemble member's daily mean temperature, which gives the shaded range. Forecast lows come from the 16-day forecast, then the ensemble median.</p>
+    <p>The outlook comes from the ECMWF IFS extended-range (sub-seasonal) ensemble, EC46, which ECMWF runs daily out to 46 days. The hardiness model is run separately through each of its 51 members' daily mean temperature, which gives the shaded 10–90% range. Forecast lows come from the 16-day forecast, then the EC46 ensemble median.</p>
     <p>Kentucky's main hybrids (Chambourcin, Vidal Blanc, Traminette, Norton) have no published parameters for this model. Calibrating them against Kentucky bud samples would be a natural joint project with Extension partners.</p></details>`;
   chart(document.getElementById('c1'),{dates,height:340,yLabel:'°F',today:todayIdx,aria:'Bud hardiness and daily low temperatures',
-    zones:now?[{from:todayIdx+1,to:todayIdx+15,fill:'--frost-soft',label:'16-day forecast'},{from:todayIdx+16,to:n-1,fill:'--outlook-soft',label:'Outlook (ensemble)'}]:[],
+    zones:now?[{from:todayIdx+1,to:todayIdx+15,fill:'--frost-soft',label:'16-day forecast'},{from:todayIdx+16,to:n-1,fill:'--outlook-soft',label:'ECMWF S2S outlook'}]:[],
     series:[
       ...(now?[{type:'band',lo:band.lo,hi:band.hi,color:'var(--outlook)'},{type:'line',values:band.med,color:'var(--outlook)',width:2.2,dash:'6 4'}]:[]),
       {type:'line',values:obsMin,color:'var(--muted)',width:1.2},
@@ -395,7 +397,7 @@ TOOLS.grape=function(){
       {type:'line',values:s2sMin,color:'var(--muted)',width:1.2,dash:'3 3'},
       {type:'line',values:lt,color:'var(--frost)',width:2.6},
       {type:'dots',values:hitDots,color:'var(--heat)',r:4.5}],
-    legend:[{label:'Bud hardiness (LT50)',color:'var(--frost)'},...(now?[{label:'Outlook median and 10–90% range',color:'var(--outlook)',band:true}]:[]),{label:'Daily low',color:'var(--muted)'},...(hits.length?[{label:'Low at or below LT50',color:'var(--heat)'}]:[])],
+    legend:[{label:'Bud hardiness (LT50)',color:'var(--frost)'},...(now?[{label:'S2S outlook median and 10–90% range',color:'var(--outlook)',band:true}]:[]),{label:'Daily low',color:'var(--muted)'},...(hits.length?[{label:'Low at or below LT50',color:'var(--heat)'}]:[])],
     tooltip:i=>{const r=[];if(lt[i]!=null)r.push(`Hardy to ${r1(lt[i])}°F`);if(band.med[i]!=null&&i>todayIdx)r.push(`Outlook ${r1(band.med[i])}°F (${r1(band.lo[i])} to ${r1(band.hi[i])})`);if(tmin[i]!=null)r.push(`Low ${tmin[i]}°F${now&&i>todayIdx?(i<=todayIdx+15?' forecast':' outlook median'):''}`);return r}});
 };
 
@@ -408,7 +410,7 @@ TOOLS.peach=function(){
     for(let d=0;d<days.length;d++){for(let h=0;h<24;h++){const t=hrs[d*24+h];cu=Math.max(0,cu+utahCU(t));if(t>32&&t<=45)ch++}CU.push(cu);CH.push(ch)}
     return {CU,CH,dates:ser.dates.slice(a,b+1)};
   };
-  const cur=runChill(SY+'-10-01',addDays(FIRST_FC,59)), last=runChill((SY-1)+'-10-01',SY+'-03-31');
+  const cur=runChill(SY+'-10-01',addDays(FIRST_FC,st.smed.length-1)), last=runChill((SY-1)+'-10-01',SY+'-03-31');
   const n=last.dates.length, tIdxRaw=diffDays(SY+'-10-01',LAST_OBS), tIdx=Math.max(0,tIdxRaw);
   cur.CU=cur.CU.slice(0,n);cur.CH=cur.CH.slice(0,n);cur.dates=cur.dates.slice(0,n);
   const hrs=state.chillMetric==='hours', unit=hrs?'chill hours':'Utah chill units';
@@ -431,7 +433,7 @@ TOOLS.peach=function(){
     <div class="chartwrap" id="c1"></div>
     <div class="grid2">
       <div class="card"><h3>Chill so far</h3><p class="big">${r0(cur.CU[tIdx])}</p><p class="muted">${unit} since Oct 1</p></div>
-      <div class="card"><h3>Projected by ${fmtD(cur.dates[endI])}</h3><p class="big">${r0(cur.CU[endI])}</p><p class="muted">${unit}, using the 16-day forecast then the outlook median</p></div>
+      <div class="card"><h3>Projected by ${fmtD(cur.dates[endI])}</h3><p class="big">${r0(cur.CU[endI])}</p><p class="muted">${unit}, using the 16-day forecast, then the ECMWF S2S ensemble median</p></div>
       <div class="card"><h3>Last winter, Oct 1 to Mar 31</h3><p class="big">${r0(last.CU[n-1])}</p><p class="muted">${unit}${reachLast>=0?', requirement met '+fmtD(last.dates[reachLast]):''}</p></div>
     </div>
     <div class="card" style="margin-top:1rem"><h3>Spring bud kill temperatures</h3>
@@ -445,7 +447,7 @@ TOOLS.peach=function(){
     <p>Hourly temperatures are estimated from each day's high and low (low near 6 a.m., high near 3 p.m., smooth curve between). Utah chill units follow Richardson et al. (1974): full credit between about 36 and 48°F, partial credit just outside that, and warm hours subtract. The running total is not allowed below zero. Chill hours count hours above 32°F and at or below 45°F.</p>
     <p>Critical bud temperatures are the widely used MSU/WSU Extension values for Elberta peach.</p></details>`;
   chart(document.getElementById('c1'),{dates:last.dates,dateLabel:i=>fmtD(last.dates[i]),height:300,yLabel:(hrs?'Chill hours':'Utah chill units')+' since Oct 1',today:tIdxRaw>=0?tIdx:null,aria:'Peach chill accumulation',
-    zones:[{from:tIdx+1,to:Math.min(tIdx+15,n-1),fill:'--frost-soft',label:'16-day forecast'},{from:tIdx+16,to:endI,fill:'--outlook-soft',label:'Outlook'}],
+    zones:[{from:tIdx+1,to:Math.min(tIdx+15,n-1),fill:'--frost-soft',label:'16-day forecast'},{from:tIdx+16,to:endI,fill:'--outlook-soft',label:'S2S outlook'}],
     hlines:[{y:req,label:'Requirement '+req,color:'var(--leaf)',left:true}],floor:0,
     series:[{type:'line',values:last.CU,color:'var(--muted)',width:1.6,dash:'5 4'},{type:'line',values:curObs,color:'var(--frost)',width:2.6},{type:'line',values:curFut,color:'var(--outlook)',width:2.4,dash:'6 4'}],
     legend:[{label:'This season',color:'var(--frost)'},{label:'Projected',color:'var(--outlook)',dash:1},{label:`Last season (${SY-1}–${String(SY).slice(2)})`,color:'var(--muted)',dash:1}],
@@ -466,7 +468,7 @@ TOOLS.frost=function(){
   const fut=[];for(let i=ser.nObs;i<ser.dates.length;i++)fut.push([ser.dates[i],ser.tmin[i],ser.kind[i]]);
   const firstF=fut.find(r=>r[1]<=thr);
   const coldest16=fut.slice(0,15).reduce((a,b)=>b[1]<a[1]?b:a);
-  const head=firstF?`The first ${thr}°F night at ${st.name} looks likely around <span class="num">${fmtD(firstF[0])}</span>, ${diffDays(firstF[0],med)>=0?diffDays(firstF[0],med)+' days earlier than':(-diffDays(firstF[0],med))+' days later than'} the 30-year median of ${fmtD(med)}.`:`No ${thr}°F night appears in the next 60 days at ${st.name}; the 30-year median first ${thr}°F night is ${fmtD(med)}.`;
+  const head=firstF?`The first ${thr}°F night at ${st.name} looks likely around <span class="num">${fmtD(firstF[0])}</span>, ${diffDays(firstF[0],med)>=0?diffDays(firstF[0],med)+' days earlier than':(-diffDays(firstF[0],med))+' days later than'} the 30-year median of ${fmtD(med)}.`:`No ${thr}°F night appears in the next ${st.smed.length} days at ${st.name}; the 30-year median first ${thr}°F night is ${fmtD(med)}.`;
   const sub=`${firstF?`That date comes from the ${firstF[2]==='fc'?'16-day forecast':'outlook median, which is less certain'}. `:''}The coldest night in the 16-day forecast is ${coldest16[1]}°F on ${fmtD(coldest16[0])}. Over the last 30 years, the first ${thr}°F night came by ${fmtD(e10)} in 1 year of 10 and after ${fmtD(l90)} in 1 of 10. So far this fall: ${r0(already)}% of past years had already had one by today.`;
   const lastSpring=['32','28','24'].map(t=>[t,doyToStr(Math.round(pct(st.frost[t].last,.5))),doyToStr(Math.round(pct(st.frost[t].last,.9)))]);
   main.innerHTML=`
@@ -479,7 +481,7 @@ TOOLS.frost=function(){
       <div class="card"><h3>Spring: last freeze</h3><table><thead><tr><th></th><th class="n">Median</th><th class="n">Late (1 in 10)</th></tr></thead><tbody>${lastSpring.map(([t,m,l])=>`<tr><td>${t}°F</td><td class="n">${fmtD(m)}</td><td class="n">${fmtD(l)}</td></tr>`).join('')}</tbody></table><p class="muted" style="font-size:.82rem">Peach bloom in Kentucky often lands before the late 28°F date, which is why spring freeze is the bigger peach risk.</p></div>
     </div>
     ${plug}
-    <details class="method"><summary>How this works</summary><p>Freeze odds use daily lows from the ${esc(st.name)} NWS station (via ACIS) for the last 30 complete years. A "first freeze" is the first night from July onward at or below the threshold; a "last freeze" is the last such night through June. The forecast date is the first night in the 16-day forecast, then the outlook median, at or below the threshold.</p></details>`;
+    <details class="method"><summary>How this works</summary><p>Freeze odds use daily lows from the ${esc(st.name)} NWS station (via ACIS) for the last 30 complete years. A "first freeze" is the first night from July onward at or below the threshold; a "last freeze" is the last such night through June. The forecast date is the first night at or below the threshold in the 16-day forecast, then in the ECMWF IFS extended-range (EC46) ensemble median.</p></details>`;
   const tI=dates.indexOf(LAST_OBS);
   chart(document.getElementById('c1'),{dates,height:300,yLabel:'% of years with first freeze by this date',today:tI>=0?tI:null,yMin:0,yMax:100,floor:0,aria:'Probability of first fall freeze by date',
     series:[{type:'line',values:p24,color:'var(--frost)',width:1.5,dash:'2 3'},{type:'line',values:p28,color:'var(--frost)',width:1.8,dash:'6 4'},{type:'line',values:p32,color:'var(--frost)',width:2.6},
@@ -520,7 +522,7 @@ TOOLS.spray=function(){
 const COTTON=[[700,'Pinhead square'],[1200,'First flower'],[1500,'One-inch boll'],[1800,'Peak bloom (short)'],[2200,'Peak bloom (long)'],[2400,'Cutout (short)'],[2800,'Cutout (long)'],[3000,'Terminate (short)'],[3400,'Terminate (long)']];
 function azSeries(id){const s=DATA.az[id];const dates=[],hu=[],eto=[],hs=[],kind=[];
   s.o26.forEach((o,i)=>{dates.push(addDays(META.az_start,i));hu.push(o.hu);eto.push(o.eto);hs.push(o.hs);kind.push('obs')});
-  for(let i=0;i<60;i++){const f=i<s.fc.length?s.fc[i]:s.smed[i];dates.push(addDays(FIRST_FC,i));hu.push(sineDD(f.tmin,f.tmax,55,86));eto.push(f.et0);hs.push(null);kind.push(i<s.fc.length?'fc':'s2s')}
+  for(let i=0;i<s.smed.length;i++){const f=i<s.fc.length?s.fc[i]:s.smed[i];dates.push(addDays(FIRST_FC,i));hu.push(sineDD(f.tmin,f.tmax,55,86));eto.push(f.et0);hs.push(null);kind.push(i<s.fc.length?'fc':'s2s')}
   return {dates,hu,eto,hs,kind,nObs:s.o26.length}}
 TOOLS.cotton=function(){
   const st=DATA.az[state.az], ser=azSeries(state.az);
@@ -541,7 +543,7 @@ TOOLS.cotton=function(){
   let l1=0,l2=0;const hsArr=dates.map((_,i)=>{const v=ser.hs[pI+i];if(i<=tI&&ffI>=0&&i>=ffI&&v!=null){if(v>86)l2++;else if(v>=82.4)l1++}return i<=tI?v:null});
   const daysAfter=tI;
   const head=`Cotton planted ${fmtD(state.planting)} at ${st.name} has <span class="num">${r0(now).toLocaleString()} heat units</span> after ${daysAfter} days, ${passed.length?'past '+passed[passed.length-1][1].toLowerCase():'before pinhead square'}.`;
-  const sub=(next?`Next benchmark, ${next[1].toLowerCase()} at ${next[0].toLocaleString()} HUAP, ${nextI>=0?`is projected for ${fmtD(dates[nextI])}${ser.kind[pI+nextI]==='s2s'?' (outlook)':''}`:'is not reached in the 60-day outlook'}. `:'The crop is past all benchmarks. ')+`Same planting date in ${Y-1} had ${r0(lastLY).toLocaleString()} HUAP by now, so this season is running ${now>=lastLY?r0(now-lastLY)+' units ahead':r0(lastLY-now)+' units behind'}.`+(ffI>=0&&ffI<=tI?` Since first flower (${fmtD(dates[ffI])}), ${l2} days reached Level 2 heat stress and ${l1} more reached Level 1.`:'');
+  const sub=(next?`Next benchmark, ${next[1].toLowerCase()} at ${next[0].toLocaleString()} HUAP, ${nextI>=0?`is projected for ${fmtD(dates[nextI])}${ser.kind[pI+nextI]==='s2s'?' (outlook)':''}`:`is not reached in the ${st.smed.length}-day outlook`}. `:'The crop is past all benchmarks. ')+`Same planting date in ${Y-1} had ${r0(lastLY).toLocaleString()} HUAP by now, so this season is running ${now>=lastLY?r0(now-lastLY)+' units ahead':r0(lastLY-now)+' units behind'}.`+(ffI>=0&&ffI<=tI?` Since first flower (${fmtD(dates[ffI])}), ${l2} days reached Level 2 heat stress and ${l1} more reached Level 1.`:'');
   main.innerHTML=`
     <div class="controls">${sel('AZMet station','az',azStations())}${inp('Planting date','planting','date',`min="${Y}-01-01" max="${LAST_OBS}"`)}</div>
     ${status(next&&nextI>=0?'ok':'watch',next?'Next: '+next[1]:'Past termination window')}
@@ -550,10 +552,10 @@ TOOLS.cotton=function(){
     <div class="chartwrap" id="c2" style="margin-top:1rem"></div>
     ${plug}
     <details class="method"><summary>How this works</summary>
-    <p>Heat units after planting (HUAP) use the 86/55°F thresholds standard in Arizona cotton. Observed daily values come straight from AZMet; forecast days use the single-sine method on forecast highs and lows. Stage benchmarks are the ones AZMet's own cotton growth stages tool uses (pinhead square near 700 HUAP, first flower near 1,200, cutout 2,400 to 2,800 depending on variety maturity).</p>
+    <p>Heat units after planting (HUAP) use the 86/55°F thresholds standard in Arizona cotton. Observed daily values come straight from AZMet; forecast days use the single-sine method on forecast highs and lows (16-day forecast, then the ECMWF IFS extended-range ensemble median). Stage benchmarks are the ones AZMet's own cotton growth stages tool uses (pinhead square near 700 HUAP, first flower near 1,200, cutout 2,400 to 2,800 depending on variety maturity).</p>
     <p>Heat stress uses AZMet's estimated canopy temperature: below 82.4°F is no stress, 82.4 to 86°F is Level 1, above 86°F is Level 2 (AZ1448).</p></details>`;
   chart(document.getElementById('c1'),{dates,height:320,yLabel:'Heat units after planting (86/55°F)',today:tI,right:132,aria:'Cotton heat units after planting',
-    zones:[{from:tI+1,to:Math.min(tI+15,n-1),fill:'--frost-soft',label:'16-day forecast'},{from:tI+16,to:n-1,fill:'--outlook-soft',label:'Outlook'}],
+    zones:[{from:tI+1,to:Math.min(tI+15,n-1),fill:'--frost-soft',label:'16-day forecast'},{from:tI+16,to:n-1,fill:'--outlook-soft',label:'S2S outlook'}],
     hlines:COTTON.map(([v,l])=>({y:v,label:l,color:'var(--muted)',dash:'2 4',outside:true})),floor:0,
     series:[{type:'line',values:cum25,color:'var(--muted)',width:1.5,dash:'5 4'},{type:'line',values:obs,color:'var(--leaf)',width:2.8},{type:'line',values:fut,color:'var(--outlook)',width:2.4,dash:'6 4'}],
     legend:[{label:Y+' HUAP',color:'var(--leaf)'},{label:'Projected',color:'var(--outlook)',dash:1},{label:(Y-1)+', same planting date',color:'var(--muted)',dash:1}],
@@ -587,10 +589,10 @@ TOOLS.alfalfa=function(){
     <div class="chartwrap" id="c1"></div>
     ${plug}
     <details class="method"><summary>How this works</summary>
-    <p>Daily crop water use (ETc) is reference evapotranspiration times a crop coefficient. Observed reference ET is AZMet's daily Penman-Monteith ETo; forecast days use forecast FAO-56 ET0. The crop coefficient follows FAO-56 for alfalfa hay with individual cutting periods: 0.40 just after cutting, rising to 1.20 as regrowth closes the canopy, easing to 1.15 before the next cut. Stage lengths (5, 10, 10, 5 days per 30-day cycle, as published for low-desert stands) scale with the cycle length you set.</p>
+    <p>Daily crop water use (ETc) is reference evapotranspiration times a crop coefficient. Observed reference ET is AZMet's daily Penman-Monteith ETo; forecast days use FAO-56 ET0 from the 16-day forecast, then the ECMWF IFS extended-range (EC46) ensemble median. The crop coefficient follows FAO-56 for alfalfa hay with individual cutting periods: 0.40 just after cutting, rising to 1.20 as regrowth closes the canopy, easing to 1.15 before the next cut. Stage lengths (5, 10, 10, 5 days per 30-day cycle, as published for low-desert stands) scale with the cycle length you set.</p>
     <p>A future version could add soil water balance by field and an irrigation scheduling alert.</p></details>`;
   if(tI>=0) chart(document.getElementById('c1'),{dates,height:320,yLabel:'Inches per day',today:tI,aria:'Alfalfa daily water use',
-    zones:[{from:tI+1,to:Math.min(tI+15,n-1),fill:'--frost-soft',label:'16-day forecast'},{from:tI+16,to:n-1,fill:'--outlook-soft',label:'Outlook'}],yMin:0,floor:0,
+    zones:[{from:tI+1,to:Math.min(tI+15,n-1),fill:'--frost-soft',label:'16-day forecast'},{from:tI+16,to:n-1,fill:'--outlook-soft',label:'S2S outlook'}],yMin:0,floor:0,
     series:[{type:'bar',values:eto,color:'var(--grid)',base:0},{type:'bar',values:etc,base:0,colorFn:(v,i)=>i<=tI?'var(--leaf)':'var(--outlook)',opacity:.85}],
     legend:[{label:'Reference ET (ETo)',color:'var(--rule)'},{label:'Alfalfa water use (ETc), observed',color:'var(--leaf)'},{label:'Forecast ETc',color:'var(--outlook)'}],
     tooltip:i=>[`ETo ${eto[i]!=null?r2(eto[i]):'n/a'} in.`,...(etc[i]!=null?[`Kc ${r2(K[i])}, ETc ${r2(etc[i])} in.`,`Cycle total ${r2(cum[i])} in.`]:['After next cut'])]});

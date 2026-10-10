@@ -5,7 +5,7 @@ Sources
   Kentucky observations: ACIS StnData (NOAA Regional Climate Centers)
   Arizona observations:  AZMet API (University of Arizona)
   16-day forecast and hourly forecast: Open-Meteo forecast API
-  60-day outlook: Open-Meteo seasonal ensemble (placeholder for the WKU S2S model)
+  46-day outlook: ECMWF IFS extended-range ensemble (EC46) via the Open-Meteo seasonal API
 
 Run:  python scripts/update_data.py  (writes data/data.txt; exits non-zero on failure
 so the workflow never commits a broken file)
@@ -38,8 +38,8 @@ if REGION == "ky":
     AZ = {}
 if REGION == "az":
     KY = {}
-MEMBERS = 21          # ensemble members kept (control + 20)
-OUTLOOK_DAYS = 60
+MEMBERS = 51          # all EC46 members available via Open-Meteo (control + 50)
+OUTLOOK_DAYS = 45     # EC46 runs to day 46 from its own start date
 FC_DAYS = 15
 HOURS = 120
 CLIM_YEARS = 30
@@ -152,7 +152,7 @@ def forecast(lat, lon, hourly=False):
 def seasonal(lat, lon, variables):
     r = get("https://seasonal-api.open-meteo.com/v1/seasonal",
             params={"latitude": lat, "longitude": lon, "daily": ",".join(variables),
-                    "temperature_unit": "fahrenheit", "forecast_days": OUTLOOK_DAYS + 10,
+                    "temperature_unit": "fahrenheit", "forecast_days": OUTLOOK_DAYS + 5, "models": "ecmwf_ec46",
                     "timezone": "auto"}).json()
     d = r["daily"]
     out = {"time": d["time"]}
@@ -195,7 +195,7 @@ def main():
     print("last_obs", last_obs, "season year", sy)
 
     lines = [f"META last_obs={last_obs} first_fc={first_fc} ky_start={ky_start} az_start={az_start} "
-             f"generated={dt.datetime.utcnow().strftime('%Y-%m-%dT%H:%MZ')}"]
+             f"outlook=ecmwf_ec46 generated={dt.datetime.utcnow().strftime('%Y-%m-%dT%H:%MZ')}"]
 
     # ---------- Kentucky ----------
     for sid, name in KY.items():
