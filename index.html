@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kentucky Fruit Weather: grape and peach decision tools</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F2F4EF; --panel:#FFFFFF; --ink:#17251E; --muted:#56655D; --rule:#D3DAD1; --grid:#E4E9E2;
+  --leaf:#2D6A4D; --leaf-soft:#DCEBE1; --frost:#2A6A96; --frost-soft:#D6E6F1; --heat:#B42E22; --heat-soft:#F6DCD8;
+  --amber:#B57B0C; --amber-soft:#F5E7C6; --outlook:#7B5EA7; --outlook-soft:#E7E0F1;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#111A15; --panel:#18231D; --ink:#E4EBE6; --muted:#9AAAA1; --rule:#2E3B34; --grid:#24302A;
+    --leaf:#6CBF91; --leaf-soft:#1E3529; --frost:#6FB0DD; --frost-soft:#1A2E3D; --heat:#EE7B6E; --heat-soft:#3A201D;
+    --amber:#E3AE45; --amber-soft:#3A2F17; --outlook:#B49BDB; --outlook-soft:#2B2438; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#111A15; --panel:#18231D; --ink:#E4EBE6; --muted:#9AAAA1; --rule:#2E3B34; --grid:#24302A;
+  --leaf:#6CBF91; --leaf-soft:#1E3529; --frost:#6FB0DD; --frost-soft:#1A2E3D; --heat:#EE7B6E; --heat-soft:#3A201D;
+  --amber:#E3AE45; --amber-soft:#3A2F17; --outlook:#B49BDB; --outlook-soft:#2B2438; color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:"Public Sans",system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.5;font-variant-numeric:tabular-nums}
+a{color:var(--frost)}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--frost);outline-offset:2px}
+
+.top{display:flex;align-items:baseline;justify-content:space-between;gap:1rem;flex-wrap:wrap;padding:1.1rem clamp(1rem,3vw,2rem) .9rem;border-bottom:1px solid var(--rule)}
+.brand{font-weight:700;font-size:1.05rem;letter-spacing:-.01em}
+.brand span{font-weight:400;color:var(--muted)}
+.asof{font-size:.85rem;color:var(--muted)}
+
+.shell{display:grid;grid-template-columns:15rem minmax(0,1fr);min-height:calc(100vh - 4rem)}
+nav{border-right:1px solid var(--rule);padding:1.25rem 1rem}
+.region{margin-bottom:1.5rem}
+.region h2{font-size:.95rem;margin:0 0 .15rem;font-weight:700}
+.region p{margin:0 0 .6rem;font-size:.8rem;color:var(--muted)}
+.tool{display:block;width:100%;text-align:left;background:none;border:0;border-left:3px solid transparent;padding:.45rem .7rem;margin:.1rem 0;border-radius:0 6px 6px 0;cursor:pointer;color:var(--ink)}
+.tool:hover{background:var(--grid)}
+.tool[aria-current="true"]{border-left-color:var(--leaf);background:var(--leaf-soft);font-weight:600}
+.tool small{display:block;font-weight:400;color:var(--muted);font-size:.78rem;line-height:1.3}
+
+main{padding:1.5rem clamp(1rem,3vw,2.5rem) 3rem;min-width:0}
+.controls{display:flex;flex-wrap:wrap;gap:.75rem 1.25rem;align-items:flex-end;margin-bottom:1.25rem}
+.field{display:flex;flex-direction:column;gap:.2rem;font-size:.82rem;color:var(--muted)}
+.field select,.field input{min-width:9rem;padding:.42rem .55rem;border:1px solid var(--rule);border-radius:6px;background:var(--panel);font-size:.95rem}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:7px;overflow:hidden;background:var(--panel)}
+.seg button{border:0;background:none;padding:.42rem .8rem;cursor:pointer;font-size:.9rem}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+
+.verdict{font-size:clamp(1.25rem,2.4vw,1.75rem);line-height:1.3;font-weight:600;letter-spacing:-.015em;max-width:44ch;margin:.2rem 0 .6rem}
+.verdict .num{white-space:nowrap}
+.sub{color:var(--muted);max-width:70ch;margin:0 0 1.25rem}
+.status{display:inline-block;font-size:.8rem;font-weight:600;padding:.15rem .55rem;border-radius:99px;margin-bottom:.5rem}
+.status.ok{background:var(--leaf-soft);color:var(--leaf)}
+.status.watch{background:var(--amber-soft);color:var(--amber)}
+.status.risk{background:var(--heat-soft);color:var(--heat)}
+
+.chartwrap{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:.75rem .75rem .5rem;position:relative}
+.chart{width:100%;overflow-x:auto}
+.chart svg{display:block}
+.legend{display:flex;flex-wrap:wrap;gap:.35rem 1.1rem;font-size:.8rem;color:var(--muted);padding:.35rem .25rem 0}
+.legend i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:.35rem;border-radius:2px}
+.legend i.band{height:10px;opacity:.5}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--paper);font-size:.78rem;line-height:1.35;padding:.45rem .6rem;border-radius:6px;white-space:nowrap;z-index:5;display:none;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.tip b{font-weight:600}
+
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1rem;margin-top:1.25rem}
+.card{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:1rem 1.1rem}
+.card h3{margin:0 0 .5rem;font-size:.95rem}
+.card p{margin:.3rem 0;font-size:.9rem}
+.card .big{font-size:1.6rem;margin:.1rem 0;font-weight:700;letter-spacing:-.02em;line-height:1.15}
+.muted{color:var(--muted)}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{text-align:left;padding:.35rem .5rem;border-bottom:1px solid var(--grid)}
+th{font-weight:600;color:var(--muted);font-size:.8rem}
+td.n,th.n{text-align:right}
+tr.hit td{background:var(--heat-soft)}
+.tablewrap{overflow-x:auto}
+
+.spray{display:grid;gap:2px;font-size:.7rem;overflow-x:auto}
+.spray .row{display:grid;grid-template-columns:5.5rem repeat(24,minmax(1.15rem,1fr));gap:2px;align-items:center;min-width:36rem}
+.spray .lab{color:var(--muted);font-size:.78rem}
+.spray .c{height:1.6rem;border-radius:3px}
+.c.good{background:var(--leaf)} .c.marg{background:var(--amber-soft);outline:1px solid var(--amber)} .c.bad{background:var(--grid)} .c.na{background:transparent}
+.spray .hrs{color:var(--muted);text-align:center}
+
+details.method{margin-top:1.5rem;border-top:1px solid var(--rule);padding-top:1rem;max-width:75ch}
+details.method summary{cursor:pointer;font-weight:600}
+details.method p,details.method li{font-size:.9rem;color:var(--muted)}
+.plug{margin-top:1rem;font-size:.85rem;border:1px dashed var(--outlook);background:var(--outlook-soft);border-radius:8px;padding:.6rem .8rem;max-width:75ch}
+
+@media (max-width: 760px){
+  .shell{grid-template-columns:1fr}
+  nav{border-right:0;border-bottom:1px solid var(--rule);display:flex;gap:1rem;overflow-x:auto;padding:.75rem 1rem}
+  .region{margin:0;min-width:max-content}
+  .region p{display:none}
+  .tool small{display:none}
+  .tool{display:inline-block;width:auto;border-left:0;border-bottom:3px solid transparent;border-radius:6px 6px 0 0}
+  .tool[aria-current="true"]{border-bottom-color:var(--leaf)}
+}
+@media (prefers-reduced-motion: no-preference){
+  .verdict{animation:rise .35s ease-out}
+  @keyframes rise{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">Kentucky Fruit Weather <span>grape and peach decision tools with S2S outlooks</span></div>
+  <div class="asof"><span id="asof">Loading weather…</span> · <a href="https://manmeet3591.github.io/">manmeet3591.github.io</a> · <a href="https://github.com/manmeet3591/kentucky-fruit-weather">Source</a></div>
+</header>
+<div class="shell">
+  <nav aria-label="Tools">
+    <div class="region">
+      <h2>Kentucky</h2>
+      <p>Grapes and peaches</p>
+      <button class="tool" data-tool="grape">Grape bud hardiness<small>Freeze risk to dormant buds</small></button>
+      <button class="tool" data-tool="peach">Peach chill and freeze<small>Chill toward bloom, bud kill temps</small></button>
+      <button class="tool" data-tool="frost">Frost dates<small>30-year odds plus outlook</small></button>
+      <button class="tool" data-tool="spray">Spray windows<small>Next five days, hour by hour</small></button>
+    </div>
+  </nav>
+  <main id="main" tabindex="-1"></main>
+</div>
+<div class="tip" id="tip" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+/* ---------------- data ---------------- */
+const DATA = {ky:{}, az:{}}, META={};
+let LAST_OBS, FIRST_FC, Y, SY;
+function parse(RAW){
+  let cur=null, region=null;
+  const nums=(s,sep)=>s.split(sep).map(x=>x===''?null:+x);
+  for(const line of RAW){
+    if(!line.trim())continue;
+    if(line.startsWith('META ')){line.slice(5).split(' ').forEach(kv=>{const [k,v]=kv.split('=');META[k]=v});continue}
+    if(line.startsWith('#')){
+      const [r,id,...rest]=line.slice(1).split(' ');
+      region=r.toLowerCase();
+      const meta=rest.join(' ');
+      const name=meta.replace(/\s*(start|lat)=.*$/,'');
+      cur={id,name,s2s:[]};
+      DATA[region][id]=cur; continue;
+    }
+    const sp=line.indexOf(' '); const tag=line.slice(0,sp); let body=line.slice(sp+1);
+    if(tag==='OBS') cur.obs=body.split(';').map(r=>{const [x,n]=nums(r,',');return {tmax:x,tmin:n}});
+    else if(tag==='FC' && region==='ky') cur.fc=body.split(';').map(r=>{const [x,n,p,w]=nums(r,',');return {tmax:x,tmin:n,pcp:p,wind:w}});
+    else if(tag==='FC') cur.fc=body.split(';').map(r=>{const [x,n,e]=nums(r,',');return {tmax:x,tmin:n,et0:e}});
+    else if(tag==='HR'){const m=body.match(/^start=(\S+) (.*)$/); cur.hrStart=m[1]; cur.hr=m[2].split(';').map(r=>{const [t,p,w,h]=nums(r,',');return {t,pop:p,wind:w,rh:h}})}
+    else if(/^S\d+$/.test(tag)) cur.s2s.push(nums(body,','));
+    else if(tag==='SMED' && region==='ky') cur.smed=body.split(';').map(r=>{const [x,n]=nums(r,',');return {tmax:x,tmin:n}});
+    else if(tag==='SMED') cur.smed=body.split(';').map(r=>{const [x,n,e]=nums(r,',');return {tmax:x,tmin:n,et0:e}});
+    else if(tag.startsWith('FR')){const [l,f]=body.split('|');(cur.frost=cur.frost||{})[tag.slice(2)]={last:nums(l,','),first:nums(f,',')}}
+    else if(tag==='OCUR') cur.o26=body.split(';').map(r=>{const [h,e,s]=nums(r,',');return {hu:h,eto:e,hs:s}});
+    else if(tag==='HPREV') cur.h25=nums(body,',');
+  }
+}
+
+/* ---------------- dates & helpers ---------------- */
+const D=s=>new Date(s+'T00:00:00Z');
+const iso=d=>d.toISOString().slice(0,10);
+const addDays=(s,n)=>{const d=D(s);d.setUTCDate(d.getUTCDate()+n);return iso(d)};
+const diffDays=(a,b)=>Math.round((D(b)-D(a))/864e5);
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fmtD=s=>{const d=D(s);return MON[d.getUTCMonth()]+' '+d.getUTCDate()};
+const fmtDY=s=>fmtD(s)+', '+D(s).getUTCFullYear();
+const doyToStr=(doy,yr=2026)=>addDays(yr+'-01-01',doy-1);
+const f2c=f=>(f-32)*5/9, c2f=c=>c*9/5+32;
+const r0=x=>Math.round(x), r1=x=>Math.round(x*10)/10, r2=x=>Math.round(x*100)/100;
+const sum=a=>a.reduce((s,x)=>s+(x||0),0);
+function pct(arr,p){const a=arr.filter(x=>x!=null&&!isNaN(x)).sort((x,y)=>x-y);if(!a.length)return null;const i=(a.length-1)*p,lo=Math.floor(i),hi=Math.ceil(i);return a[lo]+(a[hi]-a[lo])*(i-lo)}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------------- models ---------------- */
+// Ferguson et al. 2014 (AJEV 65:59) Table 4: Tth_endo, Tth_eco, ka_endo, kd_endo, ka_eco, kd_eco, Hc_init, Hc_max, Hc_min, theta, EDB
+const GRAPE={
+  'Cabernet franc':[13,4,.12,.04,.10,.10,-9.9,-25.4,-1.2,7,-500],
+  'Cabernet Sauvignon':[13,5,.12,.08,.10,.10,-10.3,-25.1,-1.2,7,-700],
+  'Chardonnay':[14,3,.10,.10,.02,.08,-11.8,-25.7,-1.2,7,-600],
+  'Chenin blanc':[14,4,.10,.04,.02,.10,-12.1,-24.1,-1.2,7,-700],
+  'Gewürztraminer':[13,6,.12,.06,.02,.18,-11.6,-24.9,-1.2,5,-400],
+  'Lemberger':[13,5,.10,.02,.10,.18,-13.0,-25.6,-1.2,7,-800],
+  'Malbec':[14,4,.10,.06,.08,.08,-11.5,-25.1,-1.2,7,-400],
+  'Merlot':[13,5,.10,.04,.02,.10,-10.3,-25.0,-1.2,7,-500],
+  'Pinot gris':[13,6,.12,.02,.02,.20,-12.0,-24.1,-1.2,3,-400],
+  'Riesling':[12,5,.14,.02,.10,.12,-12.6,-26.1,-1.2,7,-700],
+  'Sauvignon blanc':[14,5,.08,.06,.10,.12,-10.6,-24.9,-1.2,7,-300],
+  'Syrah':[14,4,.08,.06,.04,.08,-10.3,-24.2,-1.2,7,-700],
+  'Viognier':[14,5,.10,.08,.10,.10,-11.2,-24.0,-1.2,7,-300],
+  'Concord':[13,3,.12,.02,.10,.10,-12.8,-29.5,-2.5,3,-600],
+  'Sunbelt':[14,3,.10,.06,.10,.12,-11.8,-29.1,-2.5,1.5,-400]
+};
+function fergusonInit(p){return {Hc:p[6],ddc:0,b10:0,per:0}}
+function fergusonStep(s,p,tmeanC){
+  const [tEn,tEc,kaEn,kdEn,kaEc,kdEc,,Hmax,Hmin,theta,edb]=p;
+  const th=s.per?tEc:tEn, ka=s.per?kaEc:kaEn, kd=s.per?kdEc:kdEn, th2=s.per?theta:1;
+  const range=Hmin-Hmax;
+  const heat=tmeanC>th?tmeanC-th:0, chill=tmeanC<=th?tmeanC-th:0;
+  let deacc=heat*kd*(1-Math.pow((s.Hc-Hmax)/range,th2));
+  if(s.ddc===0) deacc=0;
+  const acc=chill*ka*(1-(Hmin-s.Hc)/range);
+  let H=s.Hc+acc+deacc; if(H<=Hmax)H=Hmax; if(H>Hmin)H=Hmin;
+  const b10=s.b10+(tmeanC<=10?tmeanC-10:0);
+  return {Hc:H,ddc:s.ddc+chill,b10,per:(s.per||b10<=edb)?1:0};
+}
+// Daily min/max -> hourly temps (min near 6:00, max near 15:00, cosine between)
+function hourly(days){ // days: [{tmin,tmax}] °F
+  const anchors=[];
+  days.forEach((d,i)=>{anchors.push([i*24+6,d.tmin]);anchors.push([i*24+15,d.tmax])});
+  const out=[];
+  for(let h=0;h<days.length*24;h++){
+    let k=anchors.findIndex(a=>a[0]>h);
+    if(k<=0){out.push(k===0?anchors[0][1]:anchors[anchors.length-1][1]);continue}
+    const [h0,t0]=anchors[k-1],[h1,t1]=anchors[k];
+    const f=(h-h0)/(h1-h0); out.push(t0+(t1-t0)*(1-Math.cos(Math.PI*f))/2);
+  }
+  return out;
+}
+function utahCU(tF){const c=f2c(tF);if(c<=1.4)return 0;if(c<=2.4)return .5;if(c<=9.1)return 1;if(c<=12.4)return .5;if(c<=15.9)return 0;if(c<=18)return -.5;return -1}
+// Single-sine degree days with horizontal upper cutoff (numerical)
+function sineDD(tmin,tmax,lo,hi){
+  if(tmin==null||tmax==null)return null;
+  const m=(tmax+tmin)/2,a=(tmax-tmin)/2;let s=0;const N=96;
+  for(let i=0;i<N;i++){const T=m+a*Math.sin(2*Math.PI*(i+.5)/N);s+=Math.min(Math.max(T,lo),hi)-lo}
+  return s/N;
+}
+
+/* ---------------- SVG chart ---------------- */
+const tip=document.getElementById('tip');
+function chart(host,cfg){
+  const W=Math.max(host.clientWidth||700,560), H=cfg.height||320, m={l:48,r:cfg.right||16,t:22,b:30};
+  const n=cfg.dates.length, iw=W-m.l-m.r, ih=H-m.t-m.b;
+  let lo=Infinity,hi=-Infinity;
+  for(const s of cfg.series){for(const k of ['values','lo','hi']) if(s[k]) for(const v of s[k]) if(v!=null){lo=Math.min(lo,v);hi=Math.max(hi,v)}}
+  for(const h of (cfg.hlines||[])){lo=Math.min(lo,h.y);hi=Math.max(hi,h.y)}
+  if(cfg.yMin!=null)lo=Math.min(lo,cfg.yMin); if(cfg.yMax!=null)hi=Math.max(hi,cfg.yMax);
+  const pad=(hi-lo)*.06||1; lo-=pad; hi+=pad; if(cfg.floor!=null)lo=Math.max(lo,cfg.floor);
+  const step=niceStep((hi-lo)/6); lo=Math.floor(lo/step)*step; hi=Math.ceil(hi/step)*step; if(cfg.floor!=null)lo=Math.max(lo,cfg.floor);
+  const x=i=>m.l+(n<=1?0:i*iw/(n-1)), y=v=>m.t+ih-(v-lo)/(hi-lo)*ih;
+  const bw=Math.max(1,iw/n*.7);
+  let g='';
+  // zones
+  for(const z of (cfg.zones||[])){
+    const hs=iw/(n-1)/2, x0=Math.max(m.l,x(z.from)-hs), x1=Math.min(W-m.r,x(Math.min(z.to,n-1))+hs);
+    g+=`<rect x="${x0}" y="${m.t}" width="${Math.max(0,x1-x0)}" height="${ih}" fill="var(${z.fill})" opacity=".55"/>`;
+    if(x1-x0>z.label.length*6+10) g+=`<text x="${x0+6}" y="${m.t+13}" font-size="11" fill="var(--muted)">${esc(z.label)}</text>`;
+  }
+  // grid
+  for(let v=lo;v<=hi+1e-9;v+=step){g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${m.l-8}" y="${y(v)+4}" font-size="11" text-anchor="end" fill="var(--muted)">${r1(v)}</text>`}
+  if(cfg.yLabel) g+=`<text x="${m.l}" y="12" font-size="11" fill="var(--muted)">${esc(cfg.yLabel)}</text>`;
+  // x ticks: first of month
+  let lastM=-1;
+  cfg.dates.forEach((s,i)=>{const d=D(s);if(d.getUTCDate()===1||i===0&&false){const mm=d.getUTCMonth();if(mm!==lastM){lastM=mm;g+=`<line x1="${x(i)}" x2="${x(i)}" y1="${m.t+ih}" y2="${m.t+ih+4}" stroke="var(--muted)"/><text x="${x(i)}" y="${H-10}" font-size="11" text-anchor="middle" fill="var(--muted)">${MON[mm]}</text>`}}});
+  // hlines
+  let lastLabY=Infinity;
+  for(const h of (cfg.hlines||[])){g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(h.y)}" y2="${y(h.y)}" stroke="${h.color||'var(--muted)'}" stroke-dasharray="${h.dash||'4 4'}" stroke-width="1"/>`;
+    if(!h.label)continue;
+    if(h.outside){const yy=y(h.y)+4;if(lastLabY-yy<12)continue;lastLabY=yy;g+=`<text x="${W-m.r+6}" y="${yy}" font-size="11" fill="var(--muted)">${esc(h.label)}</text>`;continue}
+    g+=`<text x="${h.left?m.l+4:W-m.r-4}" y="${y(h.y)-4}" font-size="11" text-anchor="${h.left?'start':'end'}" fill="${h.color||'var(--muted)'}">${esc(h.label)}</text>`}
+  // series
+  for(const s of cfg.series){
+    if(s.type==='band'){
+      let top='',bot='';
+      for(let i=0;i<n;i++){if(s.lo[i]==null||s.hi[i]==null)continue;top+=(top?'L':'M')+x(i)+','+y(s.hi[i]);}
+      for(let i=n-1;i>=0;i--){if(s.lo[i]==null||s.hi[i]==null)continue;bot+='L'+x(i)+','+y(s.lo[i]);}
+      if(top)g+=`<path d="${top}${bot}Z" fill="${s.color}" opacity="${s.opacity||.22}"/>`;
+    }else if(s.type==='bar'){
+      const base=y(Math.max(lo,s.base??lo));
+      s.values.forEach((v,i)=>{if(v==null)return;const yy=y(v);g+=`<rect x="${x(i)-bw/2}" y="${Math.min(yy,base)}" width="${bw}" height="${Math.abs(base-yy)}" fill="${s.colorFn?s.colorFn(v,i):s.color}" opacity="${s.opacity||1}"/>`});
+    }else if(s.type==='dots'){
+      s.values.forEach((v,i)=>{if(v==null)return;g+=`<circle cx="${x(i)}" cy="${y(v)}" r="${s.r||3.5}" fill="${s.color}" stroke="var(--panel)" stroke-width="1.5"/>`});
+    }else{
+      let d='',pen=false;
+      s.values.forEach((v,i)=>{if(v==null){pen=false;return}d+=(pen?'L':'M')+x(i).toFixed(1)+','+y(v).toFixed(1);pen=true});
+      g+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.width||2}" ${s.dash?`stroke-dasharray="${s.dash}"`:''} stroke-linejoin="round" stroke-linecap="round"/>`;
+    }
+  }
+  // today marker
+  if(cfg.today!=null){const tx=x(cfg.today);g+=`<line x1="${tx}" x2="${tx}" y1="${m.t}" y2="${m.t+ih}" stroke="var(--ink)" stroke-width="1.2"/><text x="${tx+4}" y="${m.t+ih-6}" font-size="11" font-weight="600" fill="var(--ink)">Today</text>`}
+  g+=`<line class="xh" x1="0" x2="0" y1="${m.t}" y2="${m.t+ih}" stroke="var(--muted)" stroke-width="1" visibility="hidden"/>`;
+  host.innerHTML=`<div class="chart"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(cfg.aria||'Chart')}">${g}<rect x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent" class="hit"/></svg></div>`+
+    (cfg.legend?`<div class="legend">${cfg.legend.map(l=>`<span><i class="${l.band?'band':''}" style="background:${l.color};${l.dash?'background:repeating-linear-gradient(90deg,'+l.color+' 0 4px,transparent 4px 7px)':''}"></i>${esc(l.label)}</span>`).join('')}</div>`:'');
+  const svg=host.querySelector('svg'),xh=svg.querySelector('.xh'),hit=svg.querySelector('.hit');
+  const move=e=>{
+    const r=svg.getBoundingClientRect();const px=(e.touches?e.touches[0].clientX:e.clientX)-r.left;
+    const i=Math.max(0,Math.min(n-1,Math.round((px-m.l)/iw*(n-1))));
+    xh.setAttribute('x1',x(i));xh.setAttribute('x2',x(i));xh.setAttribute('visibility','visible');
+    const rows=cfg.tooltip?cfg.tooltip(i):[];
+    tip.innerHTML=`<b>${cfg.dateLabel?cfg.dateLabel(i):fmtDY(cfg.dates[i])}</b>`+rows.map(r=>`<br>${r}`).join('');
+    tip.style.display='block';
+    const pr=document.body.getBoundingClientRect(), tw=tip.offsetWidth;
+    let left=r.left+x(i)+12; if(left+tw>window.innerWidth-8)left=r.left+x(i)-tw-12;
+    tip.style.left=(left+window.scrollX)+'px'; tip.style.top=(r.top+window.scrollY+m.t+8)+'px';
+  };
+  const out=()=>{xh.setAttribute('visibility','hidden');tip.style.display='none'};
+  hit.addEventListener('mousemove',move);hit.addEventListener('touchstart',move,{passive:true});hit.addEventListener('touchmove',move,{passive:true});
+  hit.addEventListener('mouseleave',out);hit.addEventListener('touchend',()=>setTimeout(out,1800));
+}
+function niceStep(raw){const p=Math.pow(10,Math.floor(Math.log10(raw)));const f=raw/p;return (f<1.5?1:f<3?2:f<7?5:10)*p}
+
+/* ---------------- UI state ---------------- */
+const state={tool:'grape',ky:'KBWG',az:'az06',cultivar:'Cabernet franc',season:'now',chillReq:850,chillMetric:'hours',stage:4,planting:null,cut:null,cycle:30,eff:80,thr:32};
+const main=document.getElementById('main');
+
+function sel(label,key,opts,attrs=''){return `<label class="field">${label}<select data-k="${key}" ${attrs}>${opts.map(o=>{const [v,t]=Array.isArray(o)?o:[o,o];return `<option value="${esc(v)}" ${String(state[key])===String(v)?'selected':''}>${esc(t)}</option>`}).join('')}</select></label>`}
+function inp(label,key,type,attrs=''){return `<label class="field">${label}<input type="${type}" data-k="${key}" value="${esc(state[key])}" ${attrs}></label>`}
+function seg(key,opts){return `<div class="seg" role="group">${opts.map(([v,t])=>`<button type="button" data-seg="${key}" data-v="${v}" aria-pressed="${state[key]===v}">${t}</button>`).join('')}</div>`}
+const kyStations=()=>Object.values(DATA.ky).map(s=>[s.id,s.name]);
+const azStations=()=>Object.values(DATA.az).map(s=>[s.id,s.name]);
+function wire(){
+  main.querySelectorAll('[data-k]').forEach(el=>el.addEventListener('change',()=>{const k=el.dataset.k;state[k]=el.type==='number'||el.type==='range'?+el.value:el.value;render()}));
+  main.querySelectorAll('[data-seg]').forEach(b=>b.addEventListener('click',()=>{state[b.dataset.seg]=isNaN(+b.dataset.v)?b.dataset.v:+b.dataset.v;render()}));
+}
+function status(kind,text){return `<span class="status ${kind}">${esc(text)}</span>`}
+const plug=`<div class="plug"><b>Where the WKU S2S model plugs in.</b> The purple outlook (days 16 to 60) currently comes from a public seasonal ensemble (Open-Meteo). Swap in the AI sub-seasonal forecast here and every tool updates, since each one runs its crop model on observed weather plus that outlook.</div>`;
+
+/* ---------------- KY series assembly ---------------- */
+function kySeries(st){ // obs from META.ky_start, then 15-day forecast, then outlook median to 60 days
+  const s=DATA.ky[st];const dates=[],tmax=[],tmin=[],kind=[];
+  s.obs.forEach((o,i)=>{dates.push(addDays(META.ky_start,i));tmax.push(o.tmax);tmin.push(o.tmin);kind.push('obs')});
+  for(let i=0;i<60;i++){const f=i<s.fc.length?s.fc[i]:s.smed[i];dates.push(addDays(FIRST_FC,i));tmax.push(f.tmax);tmin.push(f.tmin);kind.push(i<s.fc.length?'fc':'s2s')}
+  return {dates,tmax,tmin,kind,nObs:s.obs.length};
+}
+
+/* ---------------- tools ---------------- */
+const TOOLS={};
+
+TOOLS.grape=function(){
+  const st=DATA.ky[state.ky], p=GRAPE[state.cultivar], lab=p[8]===-2.5;
+  const bbC=lab?-6.4:-2.2;
+  const ser=kySeries(state.ky);
+  const now=state.season==='now';
+  const start=now?SY+'-09-07':(SY-1)+'-09-07', end=now?addDays(FIRST_FC,59):SY+'-05-15';
+  const i0=ser.dates.indexOf(start), i1=ser.dates.indexOf(end);
+  const dates=ser.dates.slice(i0,i1+1);
+  const n=dates.length, todayIdx=now?ser.dates.indexOf(LAST_OBS)-i0:null;
+  const obsEnd=now?todayIdx:n-1;
+  // run on observations
+  let s=fergusonInit(p);const lt=new Array(n).fill(null);let bbIdx=null;
+  for(let i=0;i<=obsEnd;i++){const k=i0+i;const prev=s.Hc;s=fergusonStep(s,p,f2c((ser.tmax[k]+ser.tmin[k])/2));lt[i]=c2f(s.Hc);if(bbIdx==null&&prev<bbC&&s.Hc>=bbC)bbIdx=i}
+  const tmin=dates.map((_,i)=>ser.tmin[i0+i]);
+  let band={lo:new Array(n).fill(null),hi:new Array(n).fill(null),med:new Array(n).fill(null)};
+  if(now){
+    const runs=st.s2s.map(mem=>{let ss={...s};return mem.map(t=>{ss=fergusonStep(ss,p,f2c(t));return c2f(ss.Hc)})});
+    band.lo[todayIdx]=band.hi[todayIdx]=band.med[todayIdx]=lt[todayIdx];
+    for(let d=0;d<60;d++){const col=runs.map(r=>r[d]);const i=todayIdx+1+d;band.lo[i]=pct(col,.1);band.hi[i]=pct(col,.9);band.med[i]=pct(col,.5)}
+  }
+  const obsMin=tmin.map((v,i)=>i<=obsEnd?v:null), fcMin=tmin.map((v,i)=>now&&i>=obsEnd&&i<=obsEnd+15?v:null), s2sMin=tmin.map((v,i)=>now&&i>=obsEnd+15?v:null);
+  const hits=[];for(let i=0;i<=obsEnd;i++){if(lt[i]!=null&&tmin[i]!=null&&tmin[i]<=lt[i])hits.push(i)}
+  const hitDots=tmin.map((v,i)=>hits.includes(i)?v:null);
+  // verdict
+  let head,sub,badge;
+  if(now){
+    const today=lt[todayIdx];
+    let minMargin=Infinity,minI=null;
+    for(let d=1;d<=60;d++){const i=todayIdx+d;const least=band.hi[i];if(least!=null&&tmin[i]!=null){const mg=tmin[i]-least;if(mg<minMargin){minMargin=mg;minI=i}}}
+    const endI=n-1;
+    head=`${state.cultivar} buds at ${st.name} are hardy to about <span class="num">${r0(today)}°F</span> today, and the outlook takes them to <span class="num">${r0(band.med[endI])}°F</span> by ${fmtD(dates[endI])}.`;
+    sub=`Ensemble range on ${fmtD(dates[endI])}: ${r0(band.lo[endI])}°F to ${r0(band.hi[endI])}°F. The tightest forecast night is ${fmtD(dates[minI])}, with a low near ${r0(tmin[minI])}°F against buds hardy to ${r0(band.hi[minI])}°F in the least-hardy member, a ${r0(minMargin)}°F margin.`;
+    badge=minMargin<=0?status('risk','Bud injury possible'):minMargin<=5?status('watch','Watch: small margin'):status('ok','No bud injury expected');
+  }else{
+    let hardI=0;lt.forEach((v,i)=>{if(v!=null&&v<lt[hardI])hardI=i});
+    let coldI=0;for(let i=0;i<=obsEnd;i++)if(tmin[i]<tmin[coldI])coldI=i;
+    head=hits.length?`Last winter, ${hits.length} night${hits.length>1?'s':''} at ${st.name} fell below modeled ${state.cultivar} bud hardiness.`:`Last winter, no night at ${st.name} fell below modeled ${state.cultivar} bud hardiness.`;
+    sub=`Buds peaked at ${r0(lt[hardI])}°F on ${fmtD(dates[hardI])}. The coldest night, ${r0(tmin[coldI])}°F on ${fmtD(dates[coldI])}, met buds hardy to ${r0(lt[coldI])}°F.`+(hits.length?` Nights at or below the LT50: ${hits.map(i=>fmtD(dates[i])+' ('+tmin[i]+'°F vs '+r0(lt[i])+'°F)').join(', ')}.`:'')+(bbIdx!=null?` Modeled budbreak: ${fmtD(dates[bbIdx])}.`:'');
+    badge=hits.length?status('risk',`${hits.length} injury night${hits.length>1?'s':''}`):status('ok','No injury nights');
+  }
+  main.innerHTML=`
+    <div class="controls">${sel('Station','ky',kyStations())}${sel('Cultivar','cultivar',Object.keys(GRAPE).map(k=>[k,k+(GRAPE[k][8]===-2.5?' (V. labruscana)':'')]))}
+    <div class="field">Season${seg('season',[['now','This winter: outlook'],['last',`Last winter: ${SY-1}–${String(SY).slice(2)}`]])}</div></div>
+    ${badge}<p class="verdict">${head}</p><p class="sub">${sub}</p>
+    <div class="chartwrap" id="c1"></div>
+    ${now?plug:''}
+    <details class="method"><summary>How this works</summary>
+    <p>Bud cold hardiness (LT50, the temperature that kills half the primary buds) comes from the discrete-dynamic model of Ferguson et al. (2014, Am. J. Enol. Vitic. 65:59), the same model behind NEWA's and WSU AgWeatherNet's grape tools. It starts on Sept 7 and steps through daily mean temperature, with cultivar-specific acclimation and deacclimation rates, temperature thresholds, and a chilling boundary (base 10°C) that marks the shift from endo- to ecodormancy.</p>
+    <p>For the outlook, the model is run separately through each ensemble member's daily mean temperature, which gives the shaded range. Forecast lows come from the 16-day forecast, then the ensemble median.</p>
+    <p>Kentucky's main hybrids (Chambourcin, Vidal Blanc, Traminette, Norton) have no published parameters for this model. Calibrating them against Kentucky bud samples would be a natural joint project with Extension partners.</p></details>`;
+  chart(document.getElementById('c1'),{dates,height:340,yLabel:'°F',today:todayIdx,aria:'Bud hardiness and daily low temperatures',
+    zones:now?[{from:todayIdx+1,to:todayIdx+15,fill:'--frost-soft',label:'16-day forecast'},{from:todayIdx+16,to:n-1,fill:'--outlook-soft',label:'Outlook (ensemble)'}]:[],
+    series:[
+      ...(now?[{type:'band',lo:band.lo,hi:band.hi,color:'var(--outlook)'},{type:'line',values:band.med,color:'var(--outlook)',width:2.2,dash:'6 4'}]:[]),
+      {type:'line',values:obsMin,color:'var(--muted)',width:1.2},
+      {type:'line',values:fcMin,color:'var(--frost)',width:1.4},
+      {type:'line',values:s2sMin,color:'var(--muted)',width:1.2,dash:'3 3'},
+      {type:'line',values:lt,color:'var(--frost)',width:2.6},
+      {type:'dots',values:hitDots,color:'var(--heat)',r:4.5}],
+    legend:[{label:'Bud hardiness (LT50)',color:'var(--frost)'},...(now?[{label:'Outlook median and 10–90% range',color:'var(--outlook)',band:true}]:[]),{label:'Daily low',color:'var(--muted)'},...(hits.length?[{label:'Low at or below LT50',color:'var(--heat)'}]:[])],
+    tooltip:i=>{const r=[];if(lt[i]!=null)r.push(`Hardy to ${r1(lt[i])}°F`);if(band.med[i]!=null&&i>todayIdx)r.push(`Outlook ${r1(band.med[i])}°F (${r1(band.lo[i])} to ${r1(band.hi[i])})`);if(tmin[i]!=null)r.push(`Low ${tmin[i]}°F${now&&i>todayIdx?(i<=todayIdx+15?' forecast':' outlook median'):''}`);return r}});
+};
+
+TOOLS.peach=function(){
+  const st=DATA.ky[state.ky], ser=kySeries(state.ky);
+  const runChill=(startIso,endIso)=>{
+    const a=ser.dates.indexOf(startIso), b=ser.dates.indexOf(endIso);
+    const days=[];for(let k=a;k<=b;k++)days.push({tmin:ser.tmin[k],tmax:ser.tmax[k]});
+    const hrs=hourly(days);let cu=0,ch=0;const CU=[],CH=[];
+    for(let d=0;d<days.length;d++){for(let h=0;h<24;h++){const t=hrs[d*24+h];cu=Math.max(0,cu+utahCU(t));if(t>32&&t<=45)ch++}CU.push(cu);CH.push(ch)}
+    return {CU,CH,dates:ser.dates.slice(a,b+1)};
+  };
+  const cur=runChill(SY+'-10-01',addDays(FIRST_FC,59)), last=runChill((SY-1)+'-10-01',SY+'-03-31');
+  const n=last.dates.length, tIdxRaw=diffDays(SY+'-10-01',LAST_OBS), tIdx=Math.max(0,tIdxRaw);
+  cur.CU=cur.CU.slice(0,n);cur.CH=cur.CH.slice(0,n);cur.dates=cur.dates.slice(0,n);
+  const hrs=state.chillMetric==='hours', unit=hrs?'chill hours':'Utah chill units';
+  if(hrs){cur.CU=cur.CH;last.CU=last.CH}
+  const curCU=last.dates.map((_,i)=>i<cur.CU.length?cur.CU[i]:null);
+  const curObs=curCU.map((v,i)=>i<=tIdx?v:null), curFut=curCU.map((v,i)=>i>=tIdx?v:null);
+  const endI=cur.CU.length-1, req=state.chillReq;
+  const reachLast=last.CU.findIndex(v=>v>=req);
+  const sameDayLast=last.CU[endI];
+  const stages=[['First swelling',18,1],['Calyx green',21,5],['Calyx red',23,9],['First pink',25,15],['First bloom',26,21],['Full bloom',27,24],['Post bloom',28,25]];
+  const [sName,s10,s90]=stages[state.stage];
+  // last spring nights at/below 10% kill temp for chosen stage, Feb 15 to Apr 30 of the season year
+  const springRows=[];for(let k=ser.dates.indexOf(SY+'-02-15');k<=ser.dates.indexOf(SY+'-04-30');k++){if(ser.tmin[k]<=s10)springRows.push([ser.dates[k],ser.tmin[k]])}
+  const head=`By ${fmtD(cur.dates[endI])}, peaches at ${st.name} are projected to have <span class="num">${r0(cur.CU[endI])}</span> of ${req} ${unit}, ${cur.CU[endI]>=sameDayLast?'ahead of':'behind'} last year's ${r0(sameDayLast)} on the same date.`;
+  const sub=`Chill counting starts Oct 1. Last winter the ${req}-${hrs?'hour':'unit'} requirement was ${reachLast>=0?'met on '+fmtD(last.dates[reachLast]):'not met by Mar 31'}${reachLast>=0?'. Once chill is satisfied, warm spells push buds toward bloom and the freeze table below starts to matter.':'. A cold winter earns few Utah units, since hours below about 34°F count for nothing and warm afternoons subtract; switch to chill hours to compare.'}`;
+  main.innerHTML=`
+    <div class="controls">${sel('Station','ky',kyStations())}<div class="field">Chill model${seg('chillMetric',[['hours','Chill hours (32–45°F)'],['utah','Utah units']])}</div>${inp('Requirement','chillReq','number','min="300" max="1400" step="50"')}</div>
+    ${status(cur.CU[endI]>=sameDayLast?'ok':'watch',cur.CU[endI]>=sameDayLast?'Chill ahead of last year':'Chill behind last year')}
+    <p class="verdict">${head}</p><p class="sub">${sub}</p>
+    <div class="chartwrap" id="c1"></div>
+    <div class="grid2">
+      <div class="card"><h3>Chill so far</h3><p class="big">${r0(cur.CU[tIdx])}</p><p class="muted">${unit} since Oct 1</p></div>
+      <div class="card"><h3>Projected by ${fmtD(cur.dates[endI])}</h3><p class="big">${r0(cur.CU[endI])}</p><p class="muted">${unit}, using the 16-day forecast then the outlook median</p></div>
+      <div class="card"><h3>Last winter, Oct 1 to Mar 31</h3><p class="big">${r0(last.CU[n-1])}</p><p class="muted">${unit}${reachLast>=0?', requirement met '+fmtD(last.dates[reachLast]):''}</p></div>
+    </div>
+    <div class="card" style="margin-top:1rem"><h3>Spring bud kill temperatures</h3>
+      <div class="controls" style="margin:.25rem 0 .5rem">${sel('Bud stage','stage',stages.map((s,i)=>[i,s[0]]))}</div>
+      <p>At <b>${sName.toLowerCase()}</b>, about 10% of buds die at ${s10}°F and 90% at ${s90}°F (MSU and WSU Extension, Elberta). ${springRows.length?`Last spring at ${st.name}, ${springRows.length} night${springRows.length>1?'s':''} between Feb 15 and Apr 30 reached ${s10}°F or colder:`:`Last spring at ${st.name}, no night between Feb 15 and Apr 30 reached ${s10}°F.`}</p>
+      ${springRows.length?`<div class="tablewrap"><table><thead><tr><th>Night</th><th class="n">Low</th><th>Loss if buds were at ${esc(sName.toLowerCase())}</th></tr></thead><tbody>${springRows.map(([d,t])=>`<tr class="${t<=s90?'hit':''}"><td>${fmtD(d)}</td><td class="n">${t}°F</td><td>${t<=s90?'90% or more':'10% to 90%'}</td></tr>`).join('')}</tbody></table></div>`:''}
+      <p class="muted" style="font-size:.82rem">Next step: add a bloom-date model (heat units after chill is met) so this table runs on predicted stage instead of a stage you pick.</p>
+    </div>
+    ${plug}
+    <details class="method"><summary>How this works</summary>
+    <p>Hourly temperatures are estimated from each day's high and low (low near 6 a.m., high near 3 p.m., smooth curve between). Utah chill units follow Richardson et al. (1974): full credit between about 36 and 48°F, partial credit just outside that, and warm hours subtract. The running total is not allowed below zero. Chill hours count hours above 32°F and at or below 45°F.</p>
+    <p>Critical bud temperatures are the widely used MSU/WSU Extension values for Elberta peach.</p></details>`;
+  chart(document.getElementById('c1'),{dates:last.dates,dateLabel:i=>fmtD(last.dates[i]),height:300,yLabel:(hrs?'Chill hours':'Utah chill units')+' since Oct 1',today:tIdxRaw>=0?tIdx:null,aria:'Peach chill accumulation',
+    zones:[{from:tIdx+1,to:Math.min(tIdx+15,n-1),fill:'--frost-soft',label:'16-day forecast'},{from:tIdx+16,to:endI,fill:'--outlook-soft',label:'Outlook'}],
+    hlines:[{y:req,label:'Requirement '+req,color:'var(--leaf)',left:true}],floor:0,
+    series:[{type:'line',values:last.CU,color:'var(--muted)',width:1.6,dash:'5 4'},{type:'line',values:curObs,color:'var(--frost)',width:2.6},{type:'line',values:curFut,color:'var(--outlook)',width:2.4,dash:'6 4'}],
+    legend:[{label:'This season',color:'var(--frost)'},{label:'Projected',color:'var(--outlook)',dash:1},{label:`Last season (${SY-1}–${String(SY).slice(2)})`,color:'var(--muted)',dash:1}],
+    tooltip:i=>{const r=[];if(curCU[i]!=null)r.push(`This season ${r0(curCU[i])}${i>tIdx?' (projected)':''}`);r.push(`Last season ${r0(last.CU[i])}`);return r}});
+  // chart x labels use last season dates; they share month/day
+};
+
+TOOLS.frost=function(){
+  const st=DATA.ky[state.ky], ser=kySeries(state.ky), thr=state.thr;
+  const fr=st.frost[thr];
+  const todayDoy=diffDays(Y+'-01-01',LAST_OBS)+1;
+  const dates=[];for(let d=diffDays(Y+'-01-01',Y+'-09-15')+1;d<=365;d++)dates.push(doyToStr(d,Y));
+  const prob=t=>dates.map(s=>{const doy=diffDays(Y+'-01-01',s)+1;return 100*st.frost[t].first.filter(x=>x<=doy).length/st.frost[t].first.length});
+  const p32=prob(32),p28=prob(28),p24=prob(24);
+  const already=100*fr.first.filter(x=>x<=todayDoy).length/fr.first.length;
+  const med=doyToStr(Math.round(pct(fr.first,.5)),Y), e10=doyToStr(Math.round(pct(fr.first,.1)),Y), l90=doyToStr(Math.round(pct(fr.first,.9)),Y);
+  // forecast first night <= thr
+  const fut=[];for(let i=ser.nObs;i<ser.dates.length;i++)fut.push([ser.dates[i],ser.tmin[i],ser.kind[i]]);
+  const firstF=fut.find(r=>r[1]<=thr);
+  const coldest16=fut.slice(0,15).reduce((a,b)=>b[1]<a[1]?b:a);
+  const head=firstF?`The first ${thr}°F night at ${st.name} looks likely around <span class="num">${fmtD(firstF[0])}</span>, ${diffDays(firstF[0],med)>=0?diffDays(firstF[0],med)+' days earlier than':(-diffDays(firstF[0],med))+' days later than'} the 30-year median of ${fmtD(med)}.`:`No ${thr}°F night appears in the next 60 days at ${st.name}; the 30-year median first ${thr}°F night is ${fmtD(med)}.`;
+  const sub=`${firstF?`That date comes from the ${firstF[2]==='fc'?'16-day forecast':'outlook median, which is less certain'}. `:''}The coldest night in the 16-day forecast is ${coldest16[1]}°F on ${fmtD(coldest16[0])}. Over the last 30 years, the first ${thr}°F night came by ${fmtD(e10)} in 1 year of 10 and after ${fmtD(l90)} in 1 of 10. So far this fall: ${r0(already)}% of past years had already had one by today.`;
+  const lastSpring=['32','28','24'].map(t=>[t,doyToStr(Math.round(pct(st.frost[t].last,.5))),doyToStr(Math.round(pct(st.frost[t].last,.9)))]);
+  main.innerHTML=`
+    <div class="controls">${sel('Station','ky',kyStations())}<div class="field">Threshold${seg('thr',[[32,'32°F'],[28,'28°F'],[24,'24°F']])}</div></div>
+    ${status(firstF&&firstF[2]==='fc'?'watch':'ok',firstF&&firstF[2]==='fc'?'Freeze in 16-day forecast':'No freeze in 16-day forecast')}
+    <p class="verdict">${head}</p><p class="sub">${sub}</p>
+    <div class="chartwrap" id="c1"></div>
+    <div class="grid2">
+      <div class="card"><h3>Fall: first freeze</h3><table><thead><tr><th></th><th class="n">Early (1 in 10)</th><th class="n">Median</th><th class="n">Late (1 in 10)</th></tr></thead><tbody>${[32,28,24].map(t=>`<tr><td>${t}°F</td><td class="n">${fmtD(doyToStr(Math.round(pct(st.frost[t].first,.1))))}</td><td class="n">${fmtD(doyToStr(Math.round(pct(st.frost[t].first,.5))))}</td><td class="n">${fmtD(doyToStr(Math.round(pct(st.frost[t].first,.9))))}</td></tr>`).join('')}</tbody></table></div>
+      <div class="card"><h3>Spring: last freeze</h3><table><thead><tr><th></th><th class="n">Median</th><th class="n">Late (1 in 10)</th></tr></thead><tbody>${lastSpring.map(([t,m,l])=>`<tr><td>${t}°F</td><td class="n">${fmtD(m)}</td><td class="n">${fmtD(l)}</td></tr>`).join('')}</tbody></table><p class="muted" style="font-size:.82rem">Peach bloom in Kentucky often lands before the late 28°F date, which is why spring freeze is the bigger peach risk.</p></div>
+    </div>
+    ${plug}
+    <details class="method"><summary>How this works</summary><p>Freeze odds use daily lows from the ${esc(st.name)} NWS station (via ACIS) for the last 30 complete years. A "first freeze" is the first night from July onward at or below the threshold; a "last freeze" is the last such night through June. The forecast date is the first night in the 16-day forecast, then the outlook median, at or below the threshold.</p></details>`;
+  const tI=dates.indexOf(LAST_OBS);
+  chart(document.getElementById('c1'),{dates,height:300,yLabel:'% of years with first freeze by this date',today:tI>=0?tI:null,yMin:0,yMax:100,floor:0,aria:'Probability of first fall freeze by date',
+    series:[{type:'line',values:p24,color:'var(--frost)',width:1.5,dash:'2 3'},{type:'line',values:p28,color:'var(--frost)',width:1.8,dash:'6 4'},{type:'line',values:p32,color:'var(--frost)',width:2.6},
+      {type:'dots',values:dates.map(s=>firstF&&s===firstF[0]?(thr===32?p32:thr===28?p28:p24)[dates.indexOf(s)]:null),color:'var(--heat)',r:5.5}],
+    legend:[{label:'32°F',color:'var(--frost)'},{label:'28°F',color:'var(--frost)',dash:1},{label:'24°F',color:'var(--frost)',dash:1},...(firstF?[{label:`Forecast first ${thr}°F night`,color:'var(--heat)'}]:[])],
+    tooltip:i=>[`32°F: ${r0(p32[i])}% of years`,`28°F: ${r0(p28[i])}%`,`24°F: ${r0(p24[i])}%`]});
+};
+
+TOOLS.spray=function(){
+  const st=DATA.ky[state.ky];
+  const start=new Date(st.hrStart+':00Z'); // local wall time stored as-is
+  const rows={};
+  st.hr.forEach((h,k)=>{const d=new Date(start.getTime()+k*36e5);const day=iso(d),hr=d.getUTCHours();(rows[day]=rows[day]||new Array(24).fill(null))[hr]=h});
+  const cls=h=>{if(!h)return['na','No data'];const why=[];
+    if(h.pop>=40)why.push(`${h.pop}% rain chance`);if(h.wind>10)why.push(`wind ${h.wind} mph`);if(h.t>=90)why.push(`${h.t}°F`);
+    if(why.length)return['bad',why.join(', ')];
+    const m=[];if(h.wind<3)m.push(`calm (${h.wind} mph): inversion and drift risk`);if(h.pop>=20)m.push(`${h.pop}% rain chance`);if(h.t>=85)m.push(`${h.t}°F: volatility`);if(h.t<40)m.push(`${h.t}°F`);
+    if(m.length)return['marg',m.join(', ')];return['good',`Good: ${h.t}°F, wind ${h.wind} mph, ${h.pop}% rain`]};
+  // windows: >=3 consecutive good hours between 6 and 20
+  const wins=[];Object.entries(rows).forEach(([day,arr])=>{let s=null;for(let h=7;h<=18;h++){const g=arr[h]&&cls(arr[h])[0]==='good';if(g&&s==null)s=h;if((!g||h===18)&&s!=null){const e=g&&h===18?19:h;if(e-s>=3)wins.push([day,s,e]);s=null}}});
+  const hh=h=>(h%12||12)+(h<12?' a.m.':' p.m.');
+  const best=wins.slice().sort((a,b)=>(b[2]-b[1])-(a[2]-a[1]))[0];
+  const head=wins.length?`Best spray window at ${st.name}: <span class="num">${fmtD(best[0])}, ${hh(best[1])} to ${hh(best[2])}</span>`:`No clean 3-hour spray window at ${st.name} in the next five days.`;
+  const sub=wins.length?`${wins.length} daylight window${wins.length>1?'s':''} of 3 hours or more between 7 a.m. and 7 p.m.: ${wins.map(w=>`${fmtD(w[0])}, ${hh(w[1])} to ${hh(w[2])}`).join('; ')}${''} Hover any hour for the reason it's rated the way it is.`:'Hover any hour for the reason it is rated poorly.';
+  main.innerHTML=`
+    <div class="controls">${sel('Station','ky',kyStations())}</div>
+    ${status(wins.length?'ok':'watch',wins.length?`${wins.length} spray windows`:'No clean window')}
+    <p class="verdict">${head}</p><p class="sub">${sub}</p>
+    <div class="chartwrap"><div class="spray" id="sp">
+      <div class="row"><span></span>${Array.from({length:24},(_,h)=>`<span class="hrs">${h%3===0?(h%12||12)+(h<12?'a':'p'):''}</span>`).join('')}</div>
+      ${Object.entries(rows).map(([day,arr])=>`<div class="row"><span class="lab">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][D(day).getUTCDay()]} ${fmtD(day)}</span>${arr.map((h,i)=>{const [c,t]=cls(h);return `<span class="c ${c}" tabindex="${h?0:-1}" data-t="${esc(fmtD(day)+' '+hh(i)+': '+t)}" aria-label="${esc(hh(i)+': '+t)}"></span>`}).join('')}</div>`).join('')}
+    </div><div class="legend"><span><i style="background:var(--leaf);height:10px"></i>Good</span><span><i style="background:var(--amber-soft);outline:1px solid var(--amber);height:10px"></i>Marginal</span><span><i style="background:var(--grid);height:10px"></i>Poor</span></div></div>
+    <details class="method"><summary>How this works</summary><p>Hourly forecast for the station's location (Open-Meteo). An hour is poor with a rain chance of 40% or more, wind over 10 mph, or 90°F and above. It is marginal when wind is under 3 mph (temperature inversions and drift), rain chance is 20 to 39%, or temperature is 85°F and above or under 40°F. These are general rules of thumb; product labels and rainfast intervals come first. Growers could set their own thresholds per product in a later version.</p></details>`;
+  main.querySelectorAll('.c[data-t]').forEach(c=>{const show=()=>{const r=c.getBoundingClientRect();tip.innerHTML=esc(c.dataset.t);tip.style.display='block';let left=r.left+window.scrollX;if(left+tip.offsetWidth>window.innerWidth-8)left=window.innerWidth-tip.offsetWidth-8;tip.style.left=left+'px';tip.style.top=(r.bottom+window.scrollY+6)+'px'};c.addEventListener('mouseenter',show);c.addEventListener('focus',show);c.addEventListener('mouseleave',()=>tip.style.display='none');c.addEventListener('blur',()=>tip.style.display='none')});
+};
+
+/* ---------------- AZ ---------------- */
+const COTTON=[[700,'Pinhead square'],[1200,'First flower'],[1500,'One-inch boll'],[1800,'Peak bloom (short)'],[2200,'Peak bloom (long)'],[2400,'Cutout (short)'],[2800,'Cutout (long)'],[3000,'Terminate (short)'],[3400,'Terminate (long)']];
+function azSeries(id){const s=DATA.az[id];const dates=[],hu=[],eto=[],hs=[],kind=[];
+  s.o26.forEach((o,i)=>{dates.push(addDays(META.az_start,i));hu.push(o.hu);eto.push(o.eto);hs.push(o.hs);kind.push('obs')});
+  for(let i=0;i<60;i++){const f=i<s.fc.length?s.fc[i]:s.smed[i];dates.push(addDays(FIRST_FC,i));hu.push(sineDD(f.tmin,f.tmax,55,86));eto.push(f.et0);hs.push(null);kind.push(i<s.fc.length?'fc':'s2s')}
+  return {dates,hu,eto,hs,kind,nObs:s.o26.length}}
+TOOLS.cotton=function(){
+  const st=DATA.az[state.az], ser=azSeries(state.az);
+  const pI0=ser.dates.indexOf(state.planting);
+  if(pI0<0||pI0>=ser.nObs){main.innerHTML=`<div class="controls">${sel('AZMet station','az',azStations())}${inp('Planting date','planting','date',`min="${Y}-01-01" max="${LAST_OBS}"`)}</div><p class="verdict">Pick a planting date between Jan 1 and ${fmtD(LAST_OBS)}, ${Y}.</p>`;return}
+  const pI=pI0;
+  const dates=ser.dates.slice(pI), n=dates.length, tI=ser.nObs-1-pI;
+  let acc=0;const cum=dates.map((_,i)=>{acc+=ser.hu[pI+i]||0;return acc});
+  const obs=cum.map((v,i)=>i<=tI?v:null), fut=cum.map((v,i)=>i>=tI?v:null);
+  // previous year, same calendar planting date
+  const p25=diffDays(META.az_start,state.planting);let a25=0;const cum25=dates.map((_,i)=>{const k=p25+i;if(k>=st.h25.length)return null;a25+=st.h25[k]||0;return a25});
+  const now=cum[tI];
+  const passed=COTTON.filter(s=>s[0]<=now), next=COTTON.find(s=>s[0]>now);
+  const nextI=next?cum.findIndex(v=>v>=next[0]):-1;
+  const lastLY=cum25[tI];
+  // heat stress since first flower
+  const ffI=cum.findIndex(v=>v>=1200);
+  let l1=0,l2=0;const hsArr=dates.map((_,i)=>{const v=ser.hs[pI+i];if(i<=tI&&ffI>=0&&i>=ffI&&v!=null){if(v>86)l2++;else if(v>=82.4)l1++}return i<=tI?v:null});
+  const daysAfter=tI;
+  const head=`Cotton planted ${fmtD(state.planting)} at ${st.name} has <span class="num">${r0(now).toLocaleString()} heat units</span> after ${daysAfter} days, ${passed.length?'past '+passed[passed.length-1][1].toLowerCase():'before pinhead square'}.`;
+  const sub=(next?`Next benchmark, ${next[1].toLowerCase()} at ${next[0].toLocaleString()} HUAP, ${nextI>=0?`is projected for ${fmtD(dates[nextI])}${ser.kind[pI+nextI]==='s2s'?' (outlook)':''}`:'is not reached in the 60-day outlook'}. `:'The crop is past all benchmarks. ')+`Same planting date in ${Y-1} had ${r0(lastLY).toLocaleString()} HUAP by now, so this season is running ${now>=lastLY?r0(now-lastLY)+' units ahead':r0(lastLY-now)+' units behind'}.`+(ffI>=0&&ffI<=tI?` Since first flower (${fmtD(dates[ffI])}), ${l2} days reached Level 2 heat stress and ${l1} more reached Level 1.`:'');
+  main.innerHTML=`
+    <div class="controls">${sel('AZMet station','az',azStations())}${inp('Planting date','planting','date',`min="${Y}-01-01" max="${LAST_OBS}"`)}</div>
+    ${status(next&&nextI>=0?'ok':'watch',next?'Next: '+next[1]:'Past termination window')}
+    <p class="verdict">${head}</p><p class="sub">${sub}</p>
+    <div class="chartwrap" id="c1"></div>
+    <div class="chartwrap" id="c2" style="margin-top:1rem"></div>
+    ${plug}
+    <details class="method"><summary>How this works</summary>
+    <p>Heat units after planting (HUAP) use the 86/55°F thresholds standard in Arizona cotton. Observed daily values come straight from AZMet; forecast days use the single-sine method on forecast highs and lows. Stage benchmarks are the ones AZMet's own cotton growth stages tool uses (pinhead square near 700 HUAP, first flower near 1,200, cutout 2,400 to 2,800 depending on variety maturity).</p>
+    <p>Heat stress uses AZMet's estimated canopy temperature: below 82.4°F is no stress, 82.4 to 86°F is Level 1, above 86°F is Level 2 (AZ1448).</p></details>`;
+  chart(document.getElementById('c1'),{dates,height:320,yLabel:'Heat units after planting (86/55°F)',today:tI,right:132,aria:'Cotton heat units after planting',
+    zones:[{from:tI+1,to:Math.min(tI+15,n-1),fill:'--frost-soft',label:'16-day forecast'},{from:tI+16,to:n-1,fill:'--outlook-soft',label:'Outlook'}],
+    hlines:COTTON.map(([v,l])=>({y:v,label:l,color:'var(--muted)',dash:'2 4',outside:true})),floor:0,
+    series:[{type:'line',values:cum25,color:'var(--muted)',width:1.5,dash:'5 4'},{type:'line',values:obs,color:'var(--leaf)',width:2.8},{type:'line',values:fut,color:'var(--outlook)',width:2.4,dash:'6 4'}],
+    legend:[{label:Y+' HUAP',color:'var(--leaf)'},{label:'Projected',color:'var(--outlook)',dash:1},{label:(Y-1)+', same planting date',color:'var(--muted)',dash:1}],
+    tooltip:i=>[`${Y}: ${r0(cum[i]).toLocaleString()} HUAP${i>tI?' (projected)':''}`,...(cum25[i]!=null?[`${Y-1}: ${r0(cum25[i]).toLocaleString()}`]:[])]});
+  chart(document.getElementById('c2'),{dates:dates.slice(0,tI+1),height:200,yLabel:'Estimated canopy temperature, °F',aria:'Cotton heat stress',
+    hlines:[{y:82.4,label:'Level 1 stress',color:'var(--amber)',left:true},{y:86,label:'Level 2 stress',color:'var(--heat)',left:true}],yMin:60,floor:55,
+    series:[{type:'bar',values:hsArr.slice(0,tI+1),base:60,colorFn:v=>v>86?'var(--heat)':v>=82.4?'var(--amber)':'var(--leaf)'}],
+    tooltip:i=>[`${hsArr[i]}°F: ${hsArr[i]>86?'Level 2':hsArr[i]>=82.4?'Level 1':'no'} heat stress`]});
+};
+
+TOOLS.alfalfa=function(){
+  const st=DATA.az[state.az], ser=azSeries(state.az);
+  const L=state.cycle, fr=[5,10,10,5].map(x=>x/30*L); // FAO-56 individual cutting stage shares
+  const kc=d=>{const [a,b,c]=fr;if(d<a)return .40;if(d<a+b)return .40+(1.20-.40)*(d-a)/b;if(d<a+b+c)return 1.20;return 1.20+(1.15-1.20)*Math.min(1,(d-a-b-c)/fr[3])};
+  const cI=ser.dates.indexOf(state.cut)<0?0:ser.dates.indexOf(state.cut);
+  const dates=[];const n=Math.min(ser.dates.length-cI,L+20);for(let i=0;i<n;i++)dates.push(ser.dates[cI+i]);
+  const tI=ser.nObs-1-cI;
+  const eto=dates.map((_,i)=>ser.eto[cI+i]), K=dates.map((_,i)=>i<L?kc(i):null), etc=dates.map((_,i)=>i<L&&eto[i]!=null?eto[i]*K[i]:null);
+  let c=0;const cum=etc.map(v=>v==null?null:(c+=v));
+  const used=tI>=0?sum(etc.slice(0,tI+1)):0;
+  const next7=sum(etc.slice(tI+1,tI+8));
+  const total=sum(etc.slice(0,L));
+  const nextCut=addDays(state.cut,L);
+  const gross=used/(state.eff/100);
+  const head=tI<0?`That cutting date is after the latest data (${fmtD(LAST_OBS)}). Pick an earlier date.`:`Since cutting on ${fmtD(state.cut)}, alfalfa at ${st.name} has used about <span class="num">${r2(used)} in.</span> of water, and will use about ${r2(next7)} in. over the next 7 days.`;
+  const sub=tI<0?'':`At ${state.eff}% irrigation efficiency, replacing that use takes about ${r2(gross)} in. applied. Over the full ${L}-day cycle to the next cut around ${fmtD(nextCut)}, crop water use totals roughly ${r2(total)} in. Daily use is now near ${r2(etc[tI+1]||etc[tI])} in./day as the canopy closes.`;
+  main.innerHTML=`
+    <div class="controls">${sel('AZMet station','az',azStations())}${inp('Last cutting','cut','date',`min="${Y}-01-01" max="${LAST_OBS}"`)}${inp('Days between cuttings','cycle','number','min="21" max="45" step="1"')}${inp('Irrigation efficiency (%)','eff','number','min="50" max="100" step="5"')}</div>
+    ${status('ok','Cycle day '+(tI+1)+' of '+L)}
+    <p class="verdict">${head}</p><p class="sub">${sub}</p>
+    <div class="chartwrap" id="c1"></div>
+    ${plug}
+    <details class="method"><summary>How this works</summary>
+    <p>Daily crop water use (ETc) is reference evapotranspiration times a crop coefficient. Observed reference ET is AZMet's daily Penman-Monteith ETo; forecast days use forecast FAO-56 ET0. The crop coefficient follows FAO-56 for alfalfa hay with individual cutting periods: 0.40 just after cutting, rising to 1.20 as regrowth closes the canopy, easing to 1.15 before the next cut. Stage lengths (5, 10, 10, 5 days per 30-day cycle, as published for low-desert stands) scale with the cycle length you set.</p>
+    <p>A future version could add soil water balance by field and an irrigation scheduling alert.</p></details>`;
+  if(tI>=0) chart(document.getElementById('c1'),{dates,height:320,yLabel:'Inches per day',today:tI,aria:'Alfalfa daily water use',
+    zones:[{from:tI+1,to:Math.min(tI+15,n-1),fill:'--frost-soft',label:'16-day forecast'},{from:tI+16,to:n-1,fill:'--outlook-soft',label:'Outlook'}],yMin:0,floor:0,
+    series:[{type:'bar',values:eto,color:'var(--grid)',base:0},{type:'bar',values:etc,base:0,colorFn:(v,i)=>i<=tI?'var(--leaf)':'var(--outlook)',opacity:.85}],
+    legend:[{label:'Reference ET (ETo)',color:'var(--rule)'},{label:'Alfalfa water use (ETc), observed',color:'var(--leaf)'},{label:'Forecast ETc',color:'var(--outlook)'}],
+    tooltip:i=>[`ETo ${eto[i]!=null?r2(eto[i]):'n/a'} in.`,...(etc[i]!=null?[`Kc ${r2(K[i])}, ETc ${r2(etc[i])} in.`,`Cycle total ${r2(cum[i])} in.`]:['After next cut'])]});
+};
+
+/* ---------------- render ---------------- */
+function render(){
+  document.querySelectorAll('.tool').forEach(b=>b.setAttribute('aria-current',b.dataset.tool===state.tool));
+  tip.style.display='none';
+  TOOLS[state.tool]();wire();
+}
+document.querySelectorAll('.tool').forEach(b=>b.addEventListener('click',()=>{state.tool=b.dataset.tool;render();main.focus({preventScroll:true})}));
+let rt;window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(render,150)});
+(async function init(){
+  try{
+    const res=await fetch('data/data.txt',{cache:'no-cache'});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    parse((await res.text()).split('\n'));
+  }catch(e){main.innerHTML=`<p class="verdict">Weather data didn't load.</p><p class="sub">The page reads data/data.txt from this site (${esc(e.message)}). Reload the page; if it keeps failing, check the latest run of the nightly update workflow.</p>`;return}
+  LAST_OBS=META.last_obs; FIRST_FC=META.first_fc; Y=+LAST_OBS.slice(0,4);
+  const md=LAST_OBS.slice(5); SY=md>='09-07'?Y:Y-1;
+  state.planting=Y+'-04-15'; state.cut=addDays(LAST_OBS,-12);
+  document.getElementById('asof').textContent='Weather through '+fmtDY(LAST_OBS)+', updated nightly';
+  render();
+})();
+</script>
+</body>
+</html>
